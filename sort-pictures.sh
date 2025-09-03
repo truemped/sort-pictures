@@ -14,7 +14,9 @@ DEST_DIR=""
 JPG_DIR=""
 RAW_DIR=""
 SEPARATE_FORMATS=false
+PARALLEL_JOBS=1
 EXIFTOOL_AVAILABLE=false
+TEMP_DIR=""
 
 # Usage function
 usage() {
@@ -33,6 +35,7 @@ OPTIONS:
     -d, --dry-run       Show what would be done without making changes
     -v, --verbose       Enable verbose output
     -s, --separate-formats  Enable separate sorting for JPG and RAW files
+    -j, --jobs N        Number of parallel jobs (default: 1, max: 16)
     --jpg-dir DIR       Base directory for JPG files (requires --separate-formats)
     --raw-dir DIR       Base directory for RAW files (requires --separate-formats)
     -h, --help         Show this help message
@@ -44,7 +47,11 @@ EXAMPLES:
     
     # Separate JPG and RAW files
     $0 --separate-formats --jpg-dir /volume1/JPG --raw-dir /volume1/RAW /volume1/photos
-    $0 -s --jpg-dir /volume1/sorted/JPG --raw-dir /volume1/sorted/RAW -dv /volume1/unsorted
+    $0 -s --jpg-dir /volume1/sorted/JPG --raw-dir /volume1/sorted/RAW -d -v /volume1/unsorted
+    
+    # Parallel processing with 4 jobs
+    $0 --jobs 4 -d -v /volume1/photos
+    $0 -j 8 -s --jpg-dir /volume1/JPG --raw-dir /volume1/RAW /volume1/large_collection
 
 EOF
 }
@@ -247,27 +254,113 @@ process_image() {
     fi
 }
 
+# Worker function for parallel processing
+process_image_worker() {
+    local file="$1"
+    local config_file="$2"
+    
+    # Source the configuration
+    source "$config_file"
+    
+    # Only process if it's an image file
+    if is_image_file "$file"; then
+        process_image "$file"
+        echo "PROCESSED:$file"
+    else
+        if [[ "$VERBOSE" == "true" ]]; then
+            echo "SKIPPED:$file"
+        fi
+    fi
+}
+
+# Export worker function for parallel execution
+export -f process_image_worker
+export -f process_image
+export -f get_image_date
+export -f is_image_file
+export -f is_jpg_file
+export -f is_raw_file
+export -f create_directory
+export -f move_file
+export -f log_info
+export -f log_verbose
+export -f log_error
+
+# Create configuration file for parallel workers
+create_worker_config() {
+    cat > "$TEMP_DIR/worker_config.sh" << EOF
+# Worker configuration
+DRY_RUN=$DRY_RUN
+VERBOSE=$VERBOSE
+SOURCE_DIR="$SOURCE_DIR"
+DEST_DIR="$DEST_DIR"
+JPG_DIR="$JPG_DIR"
+RAW_DIR="$RAW_DIR"
+SEPARATE_FORMATS=$SEPARATE_FORMATS
+EXIFTOOL_AVAILABLE=$EXIFTOOL_AVAILABLE
+EOF
+}
+
 # Process directory recursively
 process_directory() {
     local dir="$1"
     local file_count=0
     local processed_count=0
+    local skipped_count=0
     
     log_info "Processing directory: $dir"
     
-    # Find all image files recursively
-    while IFS= read -r -d '' file; do
-        ((file_count++))
-        if is_image_file "$file"; then
-            if process_image "$file"; then
-                ((processed_count++))
+    if [[ "$PARALLEL_JOBS" -eq 1 ]]; then
+        # Sequential processing (original logic)
+        while IFS= read -r -d '' file; do
+            ((file_count++))
+            if is_image_file "$file"; then
+                if process_image "$file"; then
+                    ((processed_count++))
+                fi
+            else
+                log_verbose "Skipping non-image file: $file"
+                ((skipped_count++))
             fi
-        else
-            log_verbose "Skipping non-image file: $file"
-        fi
-    done < <(find "$dir" -type f -print0)
+        done < <(find "$dir" -type f -print0)
+    else
+        # Parallel processing
+        log_info "Using $PARALLEL_JOBS parallel jobs"
+        
+        # Create temporary directory for worker communication
+        TEMP_DIR=$(mktemp -d)
+        trap "rm -rf '$TEMP_DIR'" EXIT
+        
+        # Create worker configuration file
+        create_worker_config
+        
+        # Find all files and process in parallel
+        find "$dir" -type f -print0 | \
+        xargs -0 -n 1 -P "$PARALLEL_JOBS" -I {} bash -c \
+        'process_image_worker "$1" "$2"' _ {} "$TEMP_DIR/worker_config.sh" | \
+        while IFS=':' read -r status file_path; do
+            ((file_count++))
+            case "$status" in
+                "PROCESSED")
+                    ((processed_count++))
+                    log_verbose "Processed: $file_path"
+                    ;;
+                "SKIPPED")
+                    ((skipped_count++))
+                    ;;
+            esac
+            
+            # Progress indicator for large collections
+            if [[ $((file_count % 100)) -eq 0 ]]; then
+                log_info "Progress: $file_count files checked, $processed_count processed"
+            fi
+        done
+        
+        # Clean up
+        rm -rf "$TEMP_DIR"
+    fi
     
-    log_info "Processed $processed_count out of $file_count files"
+    log_info "Completed: $processed_count processed, $skipped_count skipped out of $file_count total files"
 }
 
 # Main function
@@ -286,6 +379,16 @@ main() {
             -s|--separate-formats)
                 SEPARATE_FORMATS=true
                 shift
+                ;;
+            -j|--jobs)
+                if [[ -n "$2" && "$2" =~ ^[0-9]+$ && "$2" -gt 0 && "$2" -le 16 ]]; then
+                    PARALLEL_JOBS="$2"
+                    shift 2
+                else
+                    log_error "--jobs requires a number between 1 and 16"
+                    usage
+                    exit 1
+                fi
                 ;;
             --jpg-dir)
                 if [[ -n "$2" && "$2" != -* ]]; then
@@ -383,6 +486,7 @@ main() {
         log_info "  Format separation: DISABLED"
         log_info "  Destination directory: $DEST_DIR"
     fi
+    log_info "  Parallel jobs: $PARALLEL_JOBS"
     log_info "  Dry run: $DRY_RUN"
     log_info "  Verbose: $VERBOSE"
     log_info "  ExifTool available: $EXIFTOOL_AVAILABLE"

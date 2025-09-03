@@ -6,6 +6,7 @@ A Bash script for organizing photo collections into date-based folder structures
 
 - **Date-based organization**: Sorts photos into `year/month/day` folder structure
 - **Dual format support**: Separate JPG and RAW files into different base directories
+- **Parallel processing**: Handle thousands of files efficiently with 1-16 concurrent jobs
 - **EXIF metadata extraction**: Uses photo creation date when available, falls back to file modification time
 - **Recursive processing**: Handles nested folder structures automatically
 - **Dry-run mode**: Preview changes before execution
@@ -76,6 +77,17 @@ Get detailed information about what's happening:
 ./sort-pictures.sh --verbose --dry-run /volume1/photos
 ```
 
+### Parallel Processing (for Large Collections)
+
+Process files using multiple parallel jobs:
+```bash
+# Use 4 parallel jobs
+./sort-pictures.sh --jobs 4 /volume1/large_photo_collection
+
+# Combine with other options
+./sort-pictures.sh -j 8 --separate-formats --jpg-dir /volume1/JPG --raw-dir /volume1/RAW -d -v /volume1/photos
+```
+
 ### Combined Options
 
 ```bash
@@ -89,6 +101,7 @@ Get detailed information about what's happening:
 | `--dry-run` | `-d` | Show what would be done without making changes |
 | `--verbose` | `-v` | Enable detailed output |
 | `--separate-formats` | `-s` | Enable separate sorting for JPG and RAW files |
+| `--jobs N` | `-j` | Number of parallel jobs (1-16, default: 1) |
 | `--jpg-dir DIR` | | Base directory for JPG files (requires `--separate-formats`) |
 | `--raw-dir DIR` | | Base directory for RAW files (requires `--separate-formats`) |
 | `--help` | `-h` | Show help message |
@@ -176,6 +189,13 @@ The script determines photo dates in this order:
 - Most Linux distributions
 - macOS (with minor stat command differences handled automatically)
 
+## Performance Features
+
+- **Parallel processing**: Use `--jobs N` to process multiple files simultaneously
+- **Progress tracking**: Shows progress every 100 files when processing large collections
+- **Optimized for large datasets**: Efficiently handles thousands of files
+- **Memory efficient**: Uses streaming processing to minimize memory usage
+
 ## Safety Features
 
 - **Dry-run mode**: Always test with `--dry-run` first
@@ -201,6 +221,11 @@ This is normal if exiftool isn't installed. The script will use file modificatio
 ### Permission denied errors
 - Ensure write permissions to destination directories
 - On Synology, make sure you're running as a user with appropriate permissions
+
+### Slow processing with large collections
+- Use parallel processing: `--jobs 4` (or higher, up to 16)
+- Monitor system resources - too many jobs can overwhelm slower systems
+- For Synology NAS, start with `--jobs 2` and increase if system handles it well
 
 ## License
 
