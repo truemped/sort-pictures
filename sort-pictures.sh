@@ -240,7 +240,8 @@ process_image() {
     
     # Create destination path
     local dest_path="$base_dir/$year/$month/$day"
-    local filename=$(basename "$file")
+    local filename
+    filename=$(basename "$file")
     local dest_file="$dest_path/$filename"
     
     # Create directory structure
@@ -260,6 +261,7 @@ process_image_worker() {
     local config_file="$2"
     
     # Source the configuration
+    # shellcheck source=/dev/null
     source "$config_file"
     
     # Only process if it's an image file
@@ -329,12 +331,13 @@ process_directory() {
         
         # Create temporary directory for worker communication
         TEMP_DIR=$(mktemp -d)
-        trap "rm -rf '$TEMP_DIR'" EXIT
+        trap 'rm -rf "$TEMP_DIR"' EXIT
         
         # Create worker configuration file
         create_worker_config
         
         # Find all files and process in parallel
+        # shellcheck disable=SC2016
         find "$dir" -type f -print0 | \
         xargs -0 -n 1 -P "$PARALLEL_JOBS" -I {} bash -c \
         'process_image_worker "$1" "$2"' _ {} "$TEMP_DIR/worker_config.sh" | \
@@ -501,5 +504,7 @@ main() {
     log_info "Processing complete!"
 }
 
-# Run main function with all arguments
-main "$@"
+# Run main function with all arguments only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

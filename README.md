@@ -1,5 +1,7 @@
 # Sort Pictures
 
+[![Tests](https://github.com/username/sort-pictures/workflows/Tests/badge.svg)](https://github.com/username/sort-pictures/actions)
+
 A Bash script for organizing photo collections into date-based folder structures on Synology NAS and other Linux systems.
 
 ## Features
@@ -31,10 +33,10 @@ A Bash script for organizing photo collections into date-based folder structures
    ```bash
    # On Synology DSM
    # Install via Package Center or Entware
-   
+
    # On Ubuntu/Debian
    sudo apt install exiftool
-   
+
    # On macOS
    brew install exiftool
    ```
@@ -182,6 +184,7 @@ The script determines photo dates in this order:
 - Bash 4.0 or later
 - Standard Unix tools: `find`, `stat`, `mkdir`, `mv`
 - Optional: `exiftool` for EXIF metadata extraction
+- Development only: `bats-core` (testing), `shellcheck` (linting)
 
 ## Compatibility
 
@@ -231,12 +234,56 @@ This is normal if exiftool isn't installed. The script will use file modificatio
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## Development and Testing
+
+### Running Tests
+
+This project uses [Bats](https://github.com/bats-core/bats-core) for testing:
+
+```bash
+# Install dependencies (macOS)
+brew install bats-core shellcheck
+
+# Install dependencies (Ubuntu)
+sudo apt-get install bats shellcheck
+
+# Run all tests
+make test
+
+# Run specific test suites
+make test-unit          # Unit tests only
+make test-integration   # Integration tests only
+make test-performance   # Performance tests only
+
+# Run linting and syntax checks
+make check
+make lint
+
+# Quick smoke test
+make smoke-test
+
+# Test GitHub Actions workflow locally
+.github/workflows/workflow-test.sh
+```
+
+### Test Structure
+
+- **Unit Tests** (`tests/unit_tests.bats`): Test individual functions
+- **Integration Tests** (`tests/integration_tests.bats`): Test full script functionality
+- **Performance Tests** (`tests/performance_tests.bats`): Test with large file collections
+
+### Continuous Integration
+
+Tests run automatically on all pull requests via GitHub Actions, testing on both Ubuntu and macOS.
+
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Test thoroughly with `--dry-run`
-4. Submit a pull request
+3. Add tests for new functionality
+4. Ensure all tests pass: `make test-all`
+5. Test thoroughly with `--dry-run`
+6. Submit a pull request
 
 ## Support
 

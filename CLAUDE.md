@@ -58,6 +58,7 @@ Execute the script directly (it's executable):
 - Target platform: Synology DSM 7.1.1 or compatible Linux systems
 - Required tools: bash, find, stat, mkdir, mv
 - Optional but recommended: exiftool (for accurate date extraction from EXIF data)
+- Development dependencies: bats-core (testing), shellcheck (linting)
 - Uses POSIX-compliant shell features for maximum compatibility
 
 ## Testing and Development
