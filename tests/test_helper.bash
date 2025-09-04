@@ -57,7 +57,8 @@ create_test_image() {
         touch -t "${date//[-]/}0000" "$filepath"
     fi
     
-    echo "$filepath"
+    # Return filepath only if requested (avoid polluting test output)
+    # echo "$filepath"
 }
 
 # Create nested directory structure with test files
