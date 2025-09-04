@@ -11,7 +11,7 @@ setup_script_functions() {
     # Source the script to get access to functions without executing main
     # The script now only runs main when executed directly
     source "${SORT_PICTURES_SCRIPT}"
-    
+
     # Initialize global variables that would normally be set by argument parsing
     DRY_RUN=false
     VERBOSE=false
@@ -33,7 +33,7 @@ setup_test_dir() {
     export TEST_DEST_DIR="${TEST_TEMP_DIR}/dest"
     export TEST_JPG_DIR="${TEST_TEMP_DIR}/jpg"
     export TEST_RAW_DIR="${TEST_TEMP_DIR}/raw"
-    
+
     mkdir -p "$TEST_SOURCE_DIR" "$TEST_DEST_DIR" "$TEST_JPG_DIR" "$TEST_RAW_DIR"
 }
 
@@ -49,15 +49,15 @@ create_test_image() {
     local filename="$1"
     local date="$2"  # Format: YYYY-MM-DD
     local filepath="${TEST_SOURCE_DIR}/${filename}"
-    
+
     # Create dummy file
     echo "dummy image content" > "$filepath"
-    
+
     # Set modification time if date provided
     if [[ -n "$date" ]]; then
         touch -t "${date//[-]/}0000" "$filepath"
     fi
-    
+
     # Return filepath only if requested (avoid polluting test output)
     # echo "$filepath"
 }
@@ -66,7 +66,7 @@ create_test_image() {
 create_nested_test_structure() {
     mkdir -p "${TEST_SOURCE_DIR}/vacation/beach"
     mkdir -p "${TEST_SOURCE_DIR}/work/projects"
-    
+
     create_test_image "IMG_001.jpg" "2024-03-15"
     create_test_image "vacation/sunset.CR2" "2024-03-16"
     create_test_image "vacation/beach/photo.NEF" "2024-03-17"
