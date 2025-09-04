@@ -255,38 +255,7 @@ process_image() {
     fi
 }
 
-# Worker function for parallel processing
-process_image_worker() {
-    local file="$1"
-    local config_file="$2"
-
-    # Source the configuration
-    # shellcheck source=/dev/null
-    source "$config_file"
-
-    # Only process if it's an image file
-    if is_image_file "$file"; then
-        process_image "$file"
-        echo "PROCESSED:$file"
-    else
-        if [[ "$VERBOSE" == "true" ]]; then
-            echo "SKIPPED:$file"
-        fi
-    fi
-}
-
-# Export worker function for parallel execution
-export -f process_image_worker
-export -f process_image
-export -f get_image_date
-export -f is_image_file
-export -f is_jpg_file
-export -f is_raw_file
-export -f create_directory
-export -f move_file
-export -f log_info
-export -f log_verbose
-export -f log_error
+# Note: Worker function is now created dynamically in process_directory
 
 # Create configuration file for parallel workers
 create_worker_config() {
@@ -337,16 +306,47 @@ process_directory() {
         create_worker_config
 
         # Find all files and process in parallel
+        # Create worker script
+        cat > "$TEMP_DIR/worker.sh" << 'WORKER_EOF'
+#!/bin/bash
+# Worker script for parallel processing
+file="$1"
+config_file="$2"
+script_path="$3"
+
+# Source the main script to get function definitions
+source "$script_path"
+
+# Source the configuration
+source "$config_file"
+
+# Only process if it's an image file
+if is_image_file "$file"; then
+    if process_image "$file"; then
+        echo "PROCESSED:$file"
+    else
+        echo "FAILED:$file"
+    fi
+else
+    if [[ "$VERBOSE" == "true" ]]; then
+        echo "SKIPPED:$file"
+    fi
+fi
+WORKER_EOF
+        chmod +x "$TEMP_DIR/worker.sh"
+
+        # Process files in parallel and read results
         # shellcheck disable=SC2016
-        find "$dir" -type f -print0 | \
-        xargs -0 -n 1 -P "$PARALLEL_JOBS" -I {} bash -c \
-        'process_image_worker "$1" "$2"' _ {} "$TEMP_DIR/worker_config.sh" | \
         while IFS=':' read -r status file_path; do
             ((file_count++))
             case "$status" in
                 "PROCESSED")
                     ((processed_count++))
                     log_verbose "Processed: $file_path"
+                    ;;
+                "FAILED")
+                    log_error "Failed to process: $file_path"
+                    # Don't increment processed_count for failures
                     ;;
                 "SKIPPED")
                     ((skipped_count++))
@@ -357,7 +357,8 @@ process_directory() {
             if [[ $((file_count % 100)) -eq 0 ]]; then
                 log_info "Progress: $file_count files checked, $processed_count processed"
             fi
-        done
+        done < <(find "$dir" -type f -print0 | \
+                 xargs -0 -n 1 -P "$PARALLEL_JOBS" -I {} bash "$TEMP_DIR/worker.sh" {} "$TEMP_DIR/worker_config.sh" "${BASH_SOURCE[0]}")
 
         # Clean up
         rm -rf "$TEMP_DIR"
