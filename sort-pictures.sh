@@ -263,7 +263,7 @@ process_image_worker() {
     # Source the configuration
     # shellcheck source=/dev/null
     source "$config_file"
-    
+
     # Only process if it's an image file
     if is_image_file "$file"; then
         process_image "$file"
