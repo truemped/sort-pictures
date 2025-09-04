@@ -196,3 +196,65 @@ teardown() {
     [[ "$output" =~ "Dry run: true" ]]
     [[ "$output" =~ "Verbose: true" ]]
 }
+
+@test "@eaDir handling can be enabled" {
+    run "$SORT_PICTURES_SCRIPT" --handle-eadir --dry-run "$TEST_SOURCE_DIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Handle @eaDir: true" ]]
+}
+
+@test "@eaDir files are moved with photos when enabled" {
+    # Create test image and @eaDir structure
+    create_test_image "photo.jpg" "2024-03-15"
+    mkdir -p "$TEST_SOURCE_DIR/@eaDir"
+    echo "thumbnail data" > "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg"
+    echo "thumbnail data" > "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_THUMB_M_photo.jpg"
+    
+    run "$SORT_PICTURES_SCRIPT" --handle-eadir "$TEST_SOURCE_DIR" "$TEST_DEST_DIR"
+    [ "$status" -eq 0 ]
+    
+    # Check that photo was moved
+    [ -f "$TEST_DEST_DIR/2024/03/15/photo.jpg" ]
+    
+    # Check that @eaDir files were moved
+    [ -f "$TEST_DEST_DIR/2024/03/15/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg" ]
+    [ -f "$TEST_DEST_DIR/2024/03/15/@eaDir/SYNOPHOTO_THUMB_M_photo.jpg" ]
+    
+    # Original @eaDir files should be gone
+    [ ! -f "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg" ]
+    [ ! -f "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_THUMB_M_photo.jpg" ]
+}
+
+@test "@eaDir files are ignored when option is disabled" {
+    # Create test image and @eaDir structure
+    create_test_image "photo.jpg" "2024-03-15"
+    mkdir -p "$TEST_SOURCE_DIR/@eaDir"
+    echo "thumbnail data" > "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg"
+    
+    run "$SORT_PICTURES_SCRIPT" "$TEST_SOURCE_DIR" "$TEST_DEST_DIR"
+    [ "$status" -eq 0 ]
+    
+    # Check that photo was moved
+    [ -f "$TEST_DEST_DIR/2024/03/15/photo.jpg" ]
+    
+    # Check that @eaDir files were NOT moved
+    [ ! -f "$TEST_DEST_DIR/2024/03/15/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg" ]
+    
+    # Original @eaDir files should still exist
+    [ -f "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg" ]
+}
+
+@test "@eaDir dry run shows what would be moved" {
+    create_test_image "photo.jpg" "2024-03-15"
+    mkdir -p "$TEST_SOURCE_DIR/@eaDir"
+    echo "thumbnail data" > "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg"
+    
+    run "$SORT_PICTURES_SCRIPT" --handle-eadir --dry-run --verbose "$TEST_SOURCE_DIR" "$TEST_DEST_DIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Would create @eaDir directory" ]]
+    [[ "$output" =~ "Would move @eaDir file" ]]
+    
+    # Files should not actually be moved in dry run
+    [ ! -f "$TEST_DEST_DIR/2024/03/15/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg" ]
+    [ -f "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg" ]
+}

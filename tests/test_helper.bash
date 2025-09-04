@@ -21,6 +21,7 @@ setup_script_functions() {
     RAW_DIR=""
     SEPARATE_FORMATS=false
     PARALLEL_JOBS=1
+    HANDLE_EADIR=false
     EXIFTOOL_AVAILABLE=false
     TEMP_DIR=""
 }

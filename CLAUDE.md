@@ -17,6 +17,7 @@ Key features:
 - Recursive directory traversal for nested photo collections
 - EXIF metadata extraction (with fallback to file modification time)
 - Parallel processing support (1-16 concurrent jobs) for large collections
+- Synology @eaDir metadata handling (optional)
 - Dry-run capability for safe preview of operations
 - Extensive file format support (JPG, PNG, GIF, BMP, TIFF, CR2, NEF, ARW, DNG, ORF, RW2, CR3, RAF, SRW, PEF, X3F, etc.)
 
@@ -51,6 +52,12 @@ Execute the script directly (it's executable):
 
 # Parallel processing with format separation
 ./sort-pictures.sh -j 8 -s --jpg-dir /sorted/JPG --raw-dir /sorted/RAW /large/photo/collection
+
+# Handle Synology @eaDir metadata files
+./sort-pictures.sh --handle-eadir /volume1/photos
+
+# Combine @eaDir with other options
+./sort-pictures.sh -e -s --jpg-dir /volume1/JPG --raw-dir /volume1/RAW /volume1/synology_photos
 ```
 
 ## Compatibility Requirements

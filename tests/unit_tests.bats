@@ -152,3 +152,59 @@ teardown() {
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
+
+@test "find_eadir_files: returns empty when @eaDir doesn't exist" {
+    local test_file="$TEST_TEMP_DIR/photo.jpg"
+    echo "dummy" > "$test_file"
+    
+    run find_eadir_files "$test_file"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "find_eadir_files: finds related metadata files" {
+    local test_file="$TEST_TEMP_DIR/photo.jpg"
+    echo "dummy" > "$test_file"
+    
+    # Create @eaDir with metadata files
+    mkdir -p "$TEST_TEMP_DIR/@eaDir"
+    echo "thumb" > "$TEST_TEMP_DIR/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg"
+    echo "thumb" > "$TEST_TEMP_DIR/@eaDir/SYNOPHOTO_THUMB_M_photo.jpg"
+    echo "unrelated" > "$TEST_TEMP_DIR/@eaDir/other_file.jpg"
+    
+    run find_eadir_files "$test_file"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "SYNOPHOTO_THUMB_S_photo.jpg" ]]
+    [[ "$output" =~ "SYNOPHOTO_THUMB_M_photo.jpg" ]]
+    [[ ! "$output" =~ "other_file.jpg" ]]
+}
+
+@test "move_eadir_files: skips when HANDLE_EADIR is false" {
+    HANDLE_EADIR=false
+    DRY_RUN=false
+    
+    local source_file="$TEST_TEMP_DIR/source/photo.jpg"
+    local dest_file="$TEST_TEMP_DIR/dest/photo.jpg"
+    mkdir -p "$(dirname "$source_file")" "$(dirname "$dest_file")"
+    echo "dummy" > "$source_file"
+    
+    run move_eadir_files "$source_file" "$dest_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "move_eadir_files: works in dry run mode" {
+    HANDLE_EADIR=true
+    DRY_RUN=true
+    VERBOSE=false
+    
+    local source_file="$TEST_TEMP_DIR/source/photo.jpg"
+    local dest_file="$TEST_TEMP_DIR/dest/photo.jpg"
+    mkdir -p "$(dirname "$source_file")" "$(dirname "$dest_file")"
+    mkdir -p "$TEST_TEMP_DIR/source/@eaDir"
+    echo "dummy" > "$source_file"
+    echo "thumb" > "$TEST_TEMP_DIR/source/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg"
+    
+    run move_eadir_files "$source_file" "$dest_file"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "DRY RUN" ]]
+}
