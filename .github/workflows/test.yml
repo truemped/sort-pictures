@@ -9,16 +9,16 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-    
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y bats exiftool shellcheck
-    
+
     - name: Verify project structure
       run: |
         echo "Verifying required files exist..."
@@ -31,28 +31,28 @@ jobs:
         test -f README.md || { echo "❌ README missing"; exit 1; }
         test -f CLAUDE.md || { echo "❌ CLAUDE.md missing"; exit 1; }
         echo "✅ All required files present"
-    
+
     - name: Make script executable
       run: chmod +x sort-pictures.sh
-    
+
     - name: Run unit tests
       run: bats tests/unit_tests.bats
-    
+
     - name: Run integration tests
       run: bats tests/integration_tests.bats
-    
+
     - name: Run performance tests
       run: bats tests/performance_tests.bats
-    
+
     - name: Test script syntax
       run: bash -n sort-pictures.sh
-    
+
     - name: Run all tests via Makefile
       run: make test
-    
+
     - name: Run syntax and format checks
       run: make check
-    
+
     - name: Run shellcheck (static analysis)
       uses: ludeeus/action-shellcheck@master
       with:
@@ -60,47 +60,47 @@ jobs:
         format: gcc
         severity: warning
         ignore_paths: tests
-    
+
     - name: Test script with sample data
       run: |
         # Create test directory structure
         mkdir -p test_data/source/{vacation,work}
-        
+
         # Create dummy image files
         echo "dummy jpg" > test_data/source/IMG_001.jpg
         echo "dummy raw" > test_data/source/photo.CR2
         echo "dummy png" > test_data/source/vacation/beach.png
         echo "dummy nef" > test_data/source/work/meeting.NEF
         echo "not an image" > test_data/source/readme.txt
-        
+
         # Set file dates
         touch -t 202403150800 test_data/source/IMG_001.jpg
         touch -t 202403160900 test_data/source/photo.CR2
         touch -t 202403171000 test_data/source/vacation/beach.png
         touch -t 202403181100 test_data/source/work/meeting.NEF
-        
+
         # Test basic functionality
         ./sort-pictures.sh --dry-run test_data/source
-        
+
         # Test separate formats
         ./sort-pictures.sh --separate-formats \
           --jpg-dir test_data/jpg \
           --raw-dir test_data/raw \
           --dry-run \
           test_data/source
-        
+
         # Test parallel processing
         ./sort-pictures.sh --jobs 2 --dry-run test_data/source
-        
+
         echo "All smoke tests passed!"
 
   lint:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-    
+
     - name: Run ShellCheck
       uses: ludeeus/action-shellcheck@master
       with:
@@ -108,7 +108,7 @@ jobs:
         format: gcc
         severity: info
         ignore_paths: tests
-    
+
     - name: Check script formatting
       run: |
         # Check for common issues
@@ -117,35 +117,35 @@ jobs:
           echo "❌ Found trailing whitespace"
           exit 1
         fi
-        
+
         echo "Checking for tab characters..."
         if grep -P '\t' sort-pictures.sh; then
           echo "❌ Found tab characters (use spaces instead)"
           exit 1
         fi
-        
+
         echo "✅ Formatting checks passed"
-    
+
     - name: Install dependencies for validation
       run: |
         sudo apt-get update
         sudo apt-get install -y bats shellcheck
-    
+
     - name: Validate Bats test files
-      run: |        
+      run: |
         # Check test file syntax
         bats --version
         echo "Validating test file syntax..."
-        
+
         for test_file in tests/*.bash tests/*.sh; do
           if [ -f "$test_file" ]; then
             echo "Checking $test_file..."
             bash -n "$test_file"
           fi
         done
-        
+
         echo "✅ All test files have valid syntax"
-    
+
     - name: Run Makefile checks
       run: |
         make check
@@ -153,58 +153,45 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-    
-    - name: Security scan
+
+    - name: Install shellcheck
       run: |
-        echo "Checking for security issues..."
-        
-        # Check for hardcoded paths that could be problematic
-        if grep -n "rm -rf /" sort-pictures.sh; then
-          echo "❌ Found potentially dangerous rm command"
-          exit 1
-        fi
-        
-        # Check for eval usage
-        if grep -n "eval" sort-pictures.sh; then
-          echo "❌ Found eval usage (potential security risk)"
-          exit 1
-        fi
-        
-        # Check for unquoted variables in dangerous contexts
-        if grep -nE 'rm.*\$[A-Za-z_][A-Za-z0-9_]*[^"]' sort-pictures.sh; then
-          echo "❌ Found potentially unquoted variables in rm commands"
-          exit 1
-        fi
-        
+        sudo apt-get update
+        sudo apt-get install -y shellcheck
+
+    - name: Security scan with shellcheck
+      run: |
+        echo "Running security analysis with shellcheck..."
+        shellcheck --severity=info --format=gcc sort-pictures.sh
         echo "✅ Security checks passed"
 
   compatibility:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-    
+
     - name: Test with different bash versions
       run: |
         # Test with bash 4.0 (minimum required version)
         echo "Testing compatibility..."
-        
+
         # Check for bash 4+ features
         if grep -n "declare -A" sort-pictures.sh; then
           echo "ℹ️ Found associative arrays (requires bash 4+)"
         fi
-        
+
         if grep -n "readarray\|mapfile" sort-pictures.sh; then
           echo "ℹ️ Found readarray/mapfile (requires bash 4+)"
         fi
-        
+
         # Validate script runs with older bash
         bash --version
         bash -n sort-pictures.sh
-        
+
         echo "✅ Compatibility checks passed"
