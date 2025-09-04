@@ -9,6 +9,7 @@ A Bash script for organizing photo collections into date-based folder structures
 - **Date-based organization**: Sorts photos into `year/month/day` folder structure
 - **Dual format support**: Separate JPG and RAW files into different base directories
 - **Parallel processing**: Handle thousands of files efficiently with 1-16 concurrent jobs
+- **Synology @eaDir support**: Optionally moves metadata and thumbnail files along with photos
 - **EXIF metadata extraction**: Uses photo creation date when available, falls back to file modification time
 - **Recursive processing**: Handles nested folder structures automatically
 - **Dry-run mode**: Preview changes before execution
@@ -90,6 +91,20 @@ Process files using multiple parallel jobs:
 ./sort-pictures.sh -j 8 --separate-formats --jpg-dir /volume1/JPG --raw-dir /volume1/RAW -d -v /volume1/photos
 ```
 
+### Synology @eaDir Support
+
+When using Synology DSM Photos, enable @eaDir handling to move metadata and thumbnails:
+```bash
+# Enable @eaDir handling
+./sort-pictures.sh --handle-eadir /volume1/photos
+
+# Combine with other options
+./sort-pictures.sh -e --separate-formats --jpg-dir /volume1/JPG --raw-dir /volume1/RAW /volume1/photos
+
+# Dry run to see what @eaDir files would be moved
+./sort-pictures.sh --handle-eadir --dry-run --verbose /volume1/photos
+```
+
 ### Combined Options
 
 ```bash
@@ -104,6 +119,7 @@ Process files using multiple parallel jobs:
 | `--verbose` | `-v` | Enable detailed output |
 | `--separate-formats` | `-s` | Enable separate sorting for JPG and RAW files |
 | `--jobs N` | `-j` | Number of parallel jobs (1-16, default: 1) |
+| `--handle-eadir` | `-e` | Move Synology @eaDir metadata files with photos |
 | `--jpg-dir DIR` | | Base directory for JPG files (requires `--separate-formats`) |
 | `--raw-dir DIR` | | Base directory for RAW files (requires `--separate-formats`) |
 | `--help` | `-h` | Show help message |
@@ -204,6 +220,7 @@ The script determines photo dates in this order:
 - **Dry-run mode**: Always test with `--dry-run` first
 - **File validation**: Only processes recognized image formats
 - **Collision detection**: Prevents overwriting existing files
+- **@eaDir preservation**: Maintains Synology metadata when enabled
 - **Verbose logging**: Track exactly what's happening
 - **Error recovery**: Continues processing other files if one fails
 
@@ -229,6 +246,11 @@ This is normal if exiftool isn't installed. The script will use file modificatio
 - Use parallel processing: `--jobs 4` (or higher, up to 16)
 - Monitor system resources - too many jobs can overwhelm slower systems
 - For Synology NAS, start with `--jobs 2` and increase if system handles it well
+
+### Synology Photos app doesn't show thumbnails after sorting
+- Use `--handle-eadir` to move metadata and thumbnail files with photos
+- The Photos app will regenerate missing thumbnails automatically
+- Consider running DSM's "Re-index" function after large reorganizations
 
 ## License
 

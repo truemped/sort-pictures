@@ -15,6 +15,7 @@ JPG_DIR=""
 RAW_DIR=""
 SEPARATE_FORMATS=false
 PARALLEL_JOBS=1
+HANDLE_EADIR=false
 EXIFTOOL_AVAILABLE=false
 TEMP_DIR=""
 
@@ -36,6 +37,7 @@ OPTIONS:
     -v, --verbose       Enable verbose output
     -s, --separate-formats  Enable separate sorting for JPG and RAW files
     -j, --jobs N        Number of parallel jobs (default: 1, max: 16)
+    -e, --handle-eadir  Move Synology @eaDir metadata files with photos
     --jpg-dir DIR       Base directory for JPG files (requires --separate-formats)
     --raw-dir DIR       Base directory for RAW files (requires --separate-formats)
     -h, --help         Show this help message
@@ -52,6 +54,10 @@ EXAMPLES:
     # Parallel processing with 4 jobs
     $0 --jobs 4 -d -v /volume1/photos
     $0 -j 8 -s --jpg-dir /volume1/JPG --raw-dir /volume1/RAW /volume1/large_collection
+
+    # Handle Synology @eaDir metadata
+    $0 --handle-eadir -d -v /volume1/photos
+    $0 -e -s --jpg-dir /volume1/JPG --raw-dir /volume1/RAW /volume1/synology_photos
 
 EOF
 }
@@ -156,6 +162,98 @@ is_raw_file() {
     esac
 }
 
+# Find @eaDir metadata files for a given image file
+find_eadir_files() {
+    local image_file="$1"
+    local image_dir
+    local image_name
+    local eadir_path
+
+    image_dir=$(dirname "$image_file")
+    image_name=$(basename "$image_file")
+    eadir_path="$image_dir/@eaDir"
+
+    # Check if @eaDir exists
+    if [[ ! -d "$eadir_path" ]]; then
+        return 0
+    fi
+
+    # Find all files related to this image in @eaDir
+    # Synology creates files like:
+    # - SYNOPHOTO_THUMB_S.jpg, SYNOPHOTO_THUMB_M.jpg, SYNOPHOTO_THUMB_L.jpg, SYNOPHOTO_THUMB_XL.jpg
+    # - SYNOPHOTO_FILM_*.mp4 (for videos)
+    # - Original filename with different extensions
+    find "$eadir_path" -name "*${image_name%.*}*" 2>/dev/null || true
+}
+
+# Move @eaDir metadata files along with the image
+move_eadir_files() {
+    local source_image="$1"
+    local dest_image="$2"
+    local source_dir
+    local dest_dir
+    local source_eadir
+    local dest_eadir
+
+    if [[ "$HANDLE_EADIR" != "true" ]]; then
+        return 0
+    fi
+
+    source_dir=$(dirname "$source_image")
+    dest_dir=$(dirname "$dest_image")
+    source_eadir="$source_dir/@eaDir"
+    dest_eadir="$dest_dir/@eaDir"
+
+    # Skip if source @eaDir doesn't exist
+    if [[ ! -d "$source_eadir" ]]; then
+        log_verbose "No @eaDir found for: $source_image"
+        return 0
+    fi
+
+    # Find related metadata files
+    local image_name
+    image_name=$(basename "$source_image")
+    local base_name="${image_name%.*}"
+
+    # Create destination @eaDir if it doesn't exist
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would create @eaDir directory: $dest_eadir"
+    else
+        if [[ ! -d "$dest_eadir" ]]; then
+            mkdir -p "$dest_eadir"
+            log_verbose "Created @eaDir directory: $dest_eadir"
+        fi
+    fi
+
+    # Find and move all related metadata files
+    while IFS= read -r -d '' metadata_file; do
+        if [[ -f "$metadata_file" ]]; then
+            local metadata_name
+            metadata_name=$(basename "$metadata_file")
+            local dest_metadata="$dest_eadir/$metadata_name"
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY RUN] Would move @eaDir file: $metadata_file -> $dest_metadata"
+            else
+                if [[ ! -f "$dest_metadata" ]]; then
+                    mv "$metadata_file" "$dest_metadata"
+                    log_verbose "Moved @eaDir file: $metadata_file -> $dest_metadata"
+                else
+                    log_verbose "@eaDir file already exists at destination: $dest_metadata"
+                fi
+            fi
+        fi
+    done < <(find "$source_eadir" -name "*${base_name}*" -print0 2>/dev/null || true)
+
+    # Clean up empty @eaDir directory if all files were moved
+    if [[ "$DRY_RUN" != "true" ]]; then
+        if [[ -d "$source_eadir" ]] && [[ -z "$(ls -A "$source_eadir" 2>/dev/null)" ]]; then
+            rmdir "$source_eadir" 2>/dev/null || true
+            log_verbose "Removed empty @eaDir directory: $source_eadir"
+        fi
+    fi
+}
+
 # Create directory structure
 create_directory() {
     local dir="$1"
@@ -250,6 +348,8 @@ process_image() {
     # Move file
     if [[ "$file" != "$dest_file" ]]; then
         move_file "$file" "$dest_file"
+        # Move associated @eaDir metadata files if enabled
+        move_eadir_files "$file" "$dest_file"
     else
         log_verbose "File already in correct location: $file"
     fi
@@ -268,6 +368,7 @@ DEST_DIR="$DEST_DIR"
 JPG_DIR="$JPG_DIR"
 RAW_DIR="$RAW_DIR"
 SEPARATE_FORMATS=$SEPARATE_FORMATS
+HANDLE_EADIR=$HANDLE_EADIR
 EXIFTOOL_AVAILABLE=$EXIFTOOL_AVAILABLE
 EOF
 }
@@ -285,7 +386,11 @@ process_directory() {
         # Sequential processing (original logic)
         while IFS= read -r -d '' file; do
             file_count=$((file_count + 1))
-            if is_image_file "$file"; then
+            # Skip files in @eaDir directories - they will be handled separately
+            if [[ "$file" =~ /@eaDir/ ]]; then
+                log_verbose "Skipping @eaDir file (will be moved with parent image): $file"
+                skipped_count=$((skipped_count + 1))
+            elif is_image_file "$file"; then
                 if process_image "$file"; then
                     processed_count=$((processed_count + 1))
                 fi
@@ -320,8 +425,12 @@ source "$script_path"
 # Source the configuration
 source "$config_file"
 
-# Only process if it's an image file
-if is_image_file "$file"; then
+# Skip files in @eaDir directories - they will be handled separately
+if [[ "$file" =~ /@eaDir/ ]]; then
+    if [[ "$VERBOSE" == "true" ]]; then
+        echo "SKIPPED:$file (will be moved with parent image)"
+    fi
+elif is_image_file "$file"; then
     if process_image "$file"; then
         echo "PROCESSED:$file"
     else
@@ -393,6 +502,10 @@ main() {
                     usage
                     exit 1
                 fi
+                ;;
+            -e|--handle-eadir)
+                HANDLE_EADIR=true
+                shift
                 ;;
             --jpg-dir)
                 if [[ -n "$2" && "$2" != -* ]]; then
@@ -491,6 +604,7 @@ main() {
         log_info "  Destination directory: $DEST_DIR"
     fi
     log_info "  Parallel jobs: $PARALLEL_JOBS"
+    log_info "  Handle @eaDir: $HANDLE_EADIR"
     log_info "  Dry run: $DRY_RUN"
     log_info "  Verbose: $VERBOSE"
     log_info "  ExifTool available: $EXIFTOOL_AVAILABLE"
