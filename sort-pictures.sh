@@ -44,11 +44,11 @@ EXAMPLES:
     # Basic usage
     $0 /volume1/photos
     $0 -d /volume1/photos /volume1/sorted_photos
-    
+
     # Separate JPG and RAW files
     $0 --separate-formats --jpg-dir /volume1/JPG --raw-dir /volume1/RAW /volume1/photos
     $0 -s --jpg-dir /volume1/sorted/JPG --raw-dir /volume1/sorted/RAW -d -v /volume1/unsorted
-    
+
     # Parallel processing with 4 jobs
     $0 --jobs 4 -d -v /volume1/photos
     $0 -j 8 -s --jpg-dir /volume1/JPG --raw-dir /volume1/RAW /volume1/large_collection
@@ -85,12 +85,12 @@ check_exiftool() {
 get_image_date() {
     local file="$1"
     local date_str=""
-    
+
     if [[ "$EXIFTOOL_AVAILABLE" == "true" ]]; then
         # Try to get date from EXIF data
         date_str=$(exiftool -DateTimeOriginal -CreateDate -ModifyDate -d "%Y:%m:%d" -S -s "$file" 2>/dev/null | head -n1 || true)
     fi
-    
+
     # Fallback to file modification time
     if [[ -z "$date_str" ]]; then
         if [[ "$(uname)" == "Darwin" ]]; then
@@ -101,7 +101,7 @@ get_image_date() {
             date_str=$(stat -c "%y" "$file" 2>/dev/null | cut -d' ' -f1 | tr '-' ':' || true)
         fi
     fi
-    
+
     echo "$date_str"
 }
 
@@ -110,7 +110,7 @@ is_image_file() {
     local file="$1"
     local extension="${file##*.}"
     extension=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
-    
+
     case "$extension" in
         jpg|jpeg|png|gif|bmp|tiff|tif)
             return 0
@@ -129,7 +129,7 @@ is_jpg_file() {
     local file="$1"
     local extension="${file##*.}"
     extension=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
-    
+
     case "$extension" in
         jpg|jpeg|png|gif|bmp|tiff|tif)
             return 0
@@ -145,7 +145,7 @@ is_raw_file() {
     local file="$1"
     local extension="${file##*.}"
     extension=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
-    
+
     case "$extension" in
         raw|cr2|nef|arw|dng|orf|rw2|cr3|raf|srw|pef|x3f|rwl|iiq|3fr|fff|mef|mos|mrw|ptx|dcr|kdc|srf|sr2)
             return 0
@@ -159,7 +159,7 @@ is_raw_file() {
 # Create directory structure
 create_directory() {
     local dir="$1"
-    
+
     if [[ "$DRY_RUN" == "true" ]]; then
         log_info "[DRY RUN] Would create directory: $dir"
     else
@@ -174,7 +174,7 @@ create_directory() {
 move_file() {
     local source="$1"
     local destination="$2"
-    
+
     if [[ "$DRY_RUN" == "true" ]]; then
         log_info "[DRY RUN] Would move: $source -> $destination"
     else
@@ -202,26 +202,26 @@ process_image() {
     local file="$1"
     local date_str
     local base_dir
-    
+
     log_verbose "Processing: $file"
-    
+
     # Get image date
     date_str=$(get_image_date "$file")
-    
+
     if [[ -z "$date_str" ]]; then
         log_error "Could not determine date for: $file"
         return 1
     fi
-    
+
     # Parse date components
     local year month day
     IFS=':' read -r year month day <<< "$date_str"
-    
+
     if [[ -z "$year" || -z "$month" || -z "$day" ]]; then
         log_error "Invalid date format for: $file (got: $date_str)"
         return 1
     fi
-    
+
     # Determine base directory based on file type and settings
     if [[ "$SEPARATE_FORMATS" == "true" ]]; then
         if is_jpg_file "$file"; then
@@ -237,16 +237,16 @@ process_image() {
     else
         base_dir="$DEST_DIR"
     fi
-    
+
     # Create destination path
     local dest_path="$base_dir/$year/$month/$day"
     local filename
     filename=$(basename "$file")
     local dest_file="$dest_path/$filename"
-    
+
     # Create directory structure
     create_directory "$dest_path"
-    
+
     # Move file
     if [[ "$file" != "$dest_file" ]]; then
         move_file "$file" "$dest_file"
@@ -259,7 +259,7 @@ process_image() {
 process_image_worker() {
     local file="$1"
     local config_file="$2"
-    
+
     # Source the configuration
     # shellcheck source=/dev/null
     source "$config_file"
@@ -309,9 +309,9 @@ process_directory() {
     local file_count=0
     local processed_count=0
     local skipped_count=0
-    
+
     log_info "Processing directory: $dir"
-    
+
     if [[ "$PARALLEL_JOBS" -eq 1 ]]; then
         # Sequential processing (original logic)
         while IFS= read -r -d '' file; do
@@ -328,14 +328,14 @@ process_directory() {
     else
         # Parallel processing
         log_info "Using $PARALLEL_JOBS parallel jobs"
-        
+
         # Create temporary directory for worker communication
         TEMP_DIR=$(mktemp -d)
         trap 'rm -rf "$TEMP_DIR"' EXIT
-        
+
         # Create worker configuration file
         create_worker_config
-        
+
         # Find all files and process in parallel
         # shellcheck disable=SC2016
         find "$dir" -type f -print0 | \
@@ -352,17 +352,17 @@ process_directory() {
                     ((skipped_count++))
                     ;;
             esac
-            
+
             # Progress indicator for large collections
             if [[ $((file_count % 100)) -eq 0 ]]; then
                 log_info "Progress: $file_count files checked, $processed_count processed"
             fi
         done
-        
+
         # Clean up
         rm -rf "$TEMP_DIR"
     fi
-    
+
     log_info "Completed: $processed_count processed, $skipped_count skipped out of $file_count total files"
 }
 
@@ -436,19 +436,19 @@ main() {
                 ;;
         esac
     done
-    
+
     # Validate arguments
     if [[ -z "$SOURCE_DIR" ]]; then
         log_error "SOURCE_DIRECTORY is required"
         usage
         exit 1
     fi
-    
+
     if [[ ! -d "$SOURCE_DIR" ]]; then
         log_error "SOURCE_DIRECTORY does not exist: $SOURCE_DIR"
         exit 1
     fi
-    
+
     # Validate separate formats configuration
     if [[ "$SEPARATE_FORMATS" == "true" ]]; then
         if [[ -z "$JPG_DIR" ]]; then
@@ -474,10 +474,10 @@ main() {
             create_directory "$DEST_DIR"
         fi
     fi
-    
+
     # Check for available tools
     check_exiftool
-    
+
     # Show configuration
     log_info "Configuration:"
     log_info "  Source directory: $SOURCE_DIR"
@@ -493,14 +493,14 @@ main() {
     log_info "  Dry run: $DRY_RUN"
     log_info "  Verbose: $VERBOSE"
     log_info "  ExifTool available: $EXIFTOOL_AVAILABLE"
-    
+
     if [[ "$DRY_RUN" == "true" ]]; then
         log_info "DRY RUN MODE - No files will be moved"
     fi
-    
+
     # Process the directory
     process_directory "$SOURCE_DIR"
-    
+
     log_info "Processing complete!"
 }
 
