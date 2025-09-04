@@ -284,14 +284,14 @@ process_directory() {
     if [[ "$PARALLEL_JOBS" -eq 1 ]]; then
         # Sequential processing (original logic)
         while IFS= read -r -d '' file; do
-            ((file_count++))
+            file_count=$((file_count + 1))
             if is_image_file "$file"; then
                 if process_image "$file"; then
-                    ((processed_count++))
+                    processed_count=$((processed_count + 1))
                 fi
             else
                 log_verbose "Skipping non-image file: $file"
-                ((skipped_count++))
+                skipped_count=$((skipped_count + 1))
             fi
         done < <(find "$dir" -type f -print0)
     else
@@ -338,10 +338,10 @@ WORKER_EOF
         # Process files in parallel and read results
         # shellcheck disable=SC2016
         while IFS=':' read -r status file_path; do
-            ((file_count++))
+            file_count=$((file_count + 1))
             case "$status" in
                 "PROCESSED")
-                    ((processed_count++))
+                    processed_count=$((processed_count + 1))
                     log_verbose "Processed: $file_path"
                     ;;
                 "FAILED")
@@ -349,7 +349,7 @@ WORKER_EOF
                     # Don't increment processed_count for failures
                     ;;
                 "SKIPPED")
-                    ((skipped_count++))
+                    skipped_count=$((skipped_count + 1))
                     ;;
             esac
 
