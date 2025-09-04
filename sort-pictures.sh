@@ -80,8 +80,10 @@ log_error() {
 # Check if exiftool is available
 check_exiftool() {
     if command -v exiftool >/dev/null 2>&1; then
+        local version
+        version=$(exiftool -ver 2>/dev/null || echo "unknown")
         EXIFTOOL_AVAILABLE=true
-        log_verbose "exiftool is available"
+        log_verbose "exiftool version $version is available"
     else
         log_verbose "exiftool not available, using file modification time"
     fi
@@ -405,6 +407,7 @@ process_directory() {
 
         # Create temporary directory for worker communication
         TEMP_DIR=$(mktemp -d)
+        chmod 700 "$TEMP_DIR"
         trap 'rm -rf "$TEMP_DIR"' EXIT
 
         # Create worker configuration file
