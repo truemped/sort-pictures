@@ -93,6 +93,20 @@ teardown() {
     [ ! -f "$TEST_SOURCE_DIR/img2.png" ]
 }
 
+@test "basic sorting moves video files as well" {
+    # Create a test video file with known date
+    create_test_image "clip.MOV" "2024-03-15"
+
+    run "$SORT_PICTURES_SCRIPT" "$TEST_SOURCE_DIR" "$TEST_DEST_DIR"
+    [ "$status" -eq 0 ]
+
+    # Check video was moved to correct date structure
+    [ -f "$TEST_DEST_DIR/2024/03/15/clip.MOV" ]
+
+    # Original should be gone
+    [ ! -f "$TEST_SOURCE_DIR/clip.MOV" ]
+}
+
 @test "separate formats mode sorts JPG and RAW to different directories" {
     create_test_image "photo.jpg" "2024-03-15"
     create_test_image "photo.cr2" "2024-03-15"
@@ -114,6 +128,26 @@ teardown() {
     # Check RAW files went to RAW directory
     [ -f "$TEST_RAW_DIR/2024/03/15/photo.cr2" ]
     [ -f "$TEST_RAW_DIR/2024/03/16/raw.nef" ]
+}
+
+@test "separate formats mode sends videos to JPG directory" {
+    create_test_image "photo.jpg" "2024-03-15"
+    create_test_image "footage.MP4" "2024-03-15"
+    create_test_image "raw.nef" "2024-03-15"
+
+    run "$SORT_PICTURES_SCRIPT" --separate-formats \
+        --jpg-dir "$TEST_JPG_DIR" \
+        --raw-dir "$TEST_RAW_DIR" \
+        "$TEST_SOURCE_DIR"
+
+    [ "$status" -eq 0 ]
+
+    # Videos and standard images go to JPG base
+    [ -f "$TEST_JPG_DIR/2024/03/15/photo.jpg" ]
+    [ -f "$TEST_JPG_DIR/2024/03/15/footage.MP4" ]
+
+    # RAW goes to RAW base
+    [ -f "$TEST_RAW_DIR/2024/03/15/raw.nef" ]
 }
 
 @test "script handles nested directory structures" {
@@ -257,4 +291,23 @@ teardown() {
     # Files should not actually be moved in dry run
     [ ! -f "$TEST_DEST_DIR/2024/03/15/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg" ]
     [ -f "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_THUMB_S_photo.jpg" ]
+}
+
+@test "@eaDir files move with videos when enabled" {
+    # Create test video and @eaDir structure
+    create_test_image "movie.MOV" "2024-03-15"
+    mkdir -p "$TEST_SOURCE_DIR/@eaDir"
+    echo "thumb data" > "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_FILM_S_movie.mp4"
+
+    run "$SORT_PICTURES_SCRIPT" --handle-eadir "$TEST_SOURCE_DIR" "$TEST_DEST_DIR"
+    [ "$status" -eq 0 ]
+
+    # Check that video was moved
+    [ -f "$TEST_DEST_DIR/2024/03/15/movie.MOV" ]
+
+    # Check that related @eaDir file was moved
+    [ -f "$TEST_DEST_DIR/2024/03/15/@eaDir/SYNOPHOTO_FILM_S_movie.mp4" ]
+
+    # Original @eaDir file should be gone
+    [ ! -f "$TEST_SOURCE_DIR/@eaDir/SYNOPHOTO_FILM_S_movie.mp4" ]
 }

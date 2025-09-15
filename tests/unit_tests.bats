@@ -104,6 +104,28 @@ teardown() {
     [ "$status" -eq 1 ]
 }
 
+@test "is_video_file: recognizes common video formats" {
+    run is_video_file "clip.MOV"
+    [ "$status" -eq 0 ]
+
+    run is_video_file "movie.mp4"
+    [ "$status" -eq 0 ]
+
+    run is_video_file "recording.mkv"
+    [ "$status" -eq 0 ]
+}
+
+@test "is_media_file: accepts images and videos, rejects others" {
+    run is_media_file "photo.jpg"
+    [ "$status" -eq 0 ]
+
+    run is_media_file "clip.mov"
+    [ "$status" -eq 0 ]
+
+    run is_media_file "document.pdf"
+    [ "$status" -eq 1 ]
+}
+
 @test "get_image_date: falls back to stat when exiftool unavailable" {
     # Create a test file with known modification time
     local test_file="${TEST_TEMP_DIR}/test.jpg"

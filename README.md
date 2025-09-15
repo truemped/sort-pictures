@@ -6,14 +6,14 @@ A Bash script for organizing photo collections into date-based folder structures
 
 ## Features
 
-- **Date-based organization**: Sorts photos into `year/month/day` folder structure
+- **Date-based organization**: Sorts photos and videos into `year/month/day` folder structure
 - **Dual format support**: Separate JPG and RAW files into different base directories
 - **Parallel processing**: Handle thousands of files efficiently with 1-16 concurrent jobs
 - **Synology @eaDir support**: Optionally moves metadata and thumbnail files along with photos
 - **EXIF metadata extraction**: Uses photo creation date when available, falls back to file modification time
 - **Recursive processing**: Handles nested folder structures automatically
 - **Dry-run mode**: Preview changes before execution
-- **Extensive format support**: JPG, PNG, GIF, BMP, TIFF, CR2, NEF, ARW, DNG, ORF, RW2, CR3, RAF, SRW, PEF, X3F, and more
+- **Extensive format support**: JPG, PNG, GIF, BMP, TIFF, CR2, NEF, ARW, DNG, ORF, RW2, CR3, RAF, SRW, PEF, X3F, and common video formats (MOV, MP4, MKV, etc.)
 - **Synology DSM compatible**: Tested on DSM 7.1.1-42962 Update 9
 
 ## Installation
@@ -180,13 +180,19 @@ When using Synology DSM Photos, enable @eaDir handling to move metadata and thum
 - RAF, SRW, PEF, X3F, RWL, IIQ, 3FR, FFF
 - MEF, MOS, MRW, PTX, DCR, KDC, SRF, SR2
 
+### Video Formats
+- MOV, MP4, M4V, 3GP, 3G2, AVI, MKV, WEBM, WMV, MPG, MPEG, MTS, M2TS, MOD
+
+Note: In separate-formats mode, videos are treated as non-RAW media and go to the JPG base directory.
+
 ## Date Detection
 
-The script determines photo dates in this order:
+The script determines media dates in this order:
 1. **EXIF DateTimeOriginal** (if exiftool is available)
 2. **EXIF CreateDate** (if exiftool is available)
 3. **EXIF ModifyDate** (if exiftool is available)
-4. **File modification time** (fallback)
+4. **Video tags** (MediaCreateDate, TrackCreateDate, CreationDate) when present
+5. **File modification time** (fallback)
 
 ## Error Handling
 
@@ -218,7 +224,7 @@ The script determines photo dates in this order:
 ## Safety Features
 
 - **Dry-run mode**: Always test with `--dry-run` first
-- **File validation**: Only processes recognized image formats
+- **File validation**: Only processes recognized image/video formats
 - **Collision detection**: Prevents overwriting existing files
 - **@eaDir preservation**: Maintains Synology metadata when enabled
 - **Verbose logging**: Track exactly what's happening
